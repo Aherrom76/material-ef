@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Control de Material EF</title>
+
+  <!-- Enlaces para la PWA (Manifest e Icono) -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2563eb">
+  <link rel="apple-touch-icon" href="icon.png">
+
+  <!-- Tailwind CSS para el diseño móvil -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800 min-h-screen">
+
+  <!-- PANTALLA DE LOGIN -->
+  <div id="loginView" class="fixed inset-0 bg-gray-900 bg-opacity-80 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+      <h2 class="text-2xl font-bold text-center text-blue-600 mb-6">Control de Material EF</h2>
+      <form id="loginForm" onsubmit="iniciarSesion(event)">
+        <div class="mb-4">
+          <label class="block text-sm font-medium mb-1">Usuario</label>
+          <input type="text" id="loginUser" required class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <div class="mb-6">
+          <label class="block text-sm font-medium mb-1">Contraseña</label>
+          <input type="password" id="loginPassword" required class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700 transition">Ingresar</button>
+      </form>
+      <p id="loginError" class="text-red-500 text-sm mt-3 text-center hidden">Usuario o contraseña incorrectos.</p>
+    </div>
+  </div>
+
+  <!-- BARRAS Y CONTENIDO PRINCIPAL -->
+  <div id="appView" class="hidden pb-20">
+    <!-- Encabezado -->
+    <header class="bg-blue-600 text-white p-4 sticky top-0 shadow-md z-10 flex justify-between items-center">
+      <div>
+        <h1 class="font-bold text-lg">Material Educación Física</h1>
+        <p id="userInfo" class="text-xs text-blue-200"></p>
+      </div>
+      <div class="flex gap-2">
+        <button id="btnGestionUsuarios" onclick="abrirModalUsuarios()" class="solo-admin hidden bg-blue-700 p-2 rounded-lg text-xs">👥 Usuarios</button>
+        <button onclick="cerrarSesion()" class="bg-red-500 p-2 rounded-lg text-xs">Salir</button>
+      </div>
+    </header>
+
+    <!-- Barra de búsqueda y filtros -->
+    <main class="p-4 max-w-lg mx-auto">
+      <div class="flex gap-2 mb-4">
+        <input type="text" id="searchInput" oninput="renderizarMateriales()" placeholder="Buscar material..." class="flex-1 border rounded-lg p-2 text-sm">
+        <button onclick="filtrarBajoStock()" id="btnFiltroStock" class="bg-gray-200 text-xs px-3 py-2 rounded-lg font-medium">⚠️ Bajo Stock</button>
+      </div>
+
+      <!-- Lista de tarjetas de material -->
+      <div id="listaMateriales" class="space-y-3"></div>
+    </main>
+
+    <!-- Botón flotante para añadir (solo admin) -->
+    <button onclick="abrirModalMaterial()" class="solo-admin hidden fixed bottom-6 right-6 bg-blue-600 text-white rounded-full p-4 shadow-lg text-xl font-bold hover:bg-blue-700 transition">
+      +
+    </button>
+  </div>
+
+  <!-- MODAL MATERIAL (AÑADIR / EDITAR) -->
+  <div id="modalMaterial" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl w-full max-w-md p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+      <h3 id="modalMaterialTitulo" class="text-lg font-bold text-gray-800">Añadir Material</h3>
+      <form id="formMaterial" onsubmit="guardarMaterial(event)" class="space-y-3">
+        <input type="hidden" id="materialId">
+        <div>
+          <label class="block text-xs font-semibold mb-1">Nombre del artículo</label>
+          <input type="text" id="matNombre" required class="w-full border rounded-lg p-2 text-sm">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-semibold mb-1">Cantidad Total</label>
+            <input type="number" id="matCantidad" min="0" required class="w-full border rounded-lg p-2 text-sm">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold mb-1">Stock Mínimo</label>
+            <input type="number" id="matStockMin" min="0" required class="w-full border rounded-lg p-2 text-sm">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold mb-1">Fotografía del material</label>
+          <input type="file" id="matImagenInput" accept="image/*" onchange="previewImagen(event)" class="w-full text-xs">
+          <img id="matImgPreview" class="mt-2 h-32 w-full object-cover rounded-lg hidden">
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="cerrarModalMaterial()" class="px-4 py-2 text-sm bg-gray-200 rounded-lg">Cancelar</button>
+          <button type="submit" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg font-semibold">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL VISOR DE FOTO A PANTALLA COMPLETA -->
+  <div id="modalFoto" onclick="this.classList.add('hidden')" class="fixed inset-0 bg-black bg-opacity-90 z-50 hidden flex items-center justify-center p-4">
+    <img id="fotoAmpliada" class="max-w-full max-h-full rounded-lg object-contain">
+  </div>
+
+  <!-- MODAL GESTIÓN DE USUARIOS -->
+  <div id="modalUsuarios" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl w-full max-w-md p-5 space-y-4">
+      <h3 class="text-lg font-bold text-gray-800">Administrar Usuarios</h3>
+      <form onsubmit="crearOModificarUsuario(event)" class="space-y-2 border-b pb-4">
+        <input type="text" id="newUsername" placeholder="Nombre de usuario" required class="w-full border rounded-lg p-2 text-sm">
+        <input type="password" id="newUserPass" placeholder="Contraseña" required class="w-full border rounded-lg p-2 text-sm">
+        <select id="newUserRole" class="w-full border rounded-lg p-2 text-sm">
+          <option value="consultor">Consultor (Solo lectura)</option>
+          <option value="admin">Administrador (Acceso total)</option>
+        </select>
+        <button type="submit" class="w-full bg-green-600 text-white text-sm font-semibold py-2 rounded-lg">Guardar Usuario</button>
+      </form>
+      <div id="listaUsuarios" class="space-y-2 max-h-40 overflow-y-auto"></div>
+      <button onclick="cerrarModalUsuarios()" class="w-full bg-gray-200 text-sm py-2 rounded-lg">Cerrar</button>
+    </div>
+  </div>
+
+  <script>
+    // ESTADO GENERAL Y BASE DE DATOS LOCAL
+    let usuarios = JSON.parse(localStorage.getItem('ef_usuarios')) || [
+      { user: 'admin', pass: '1234', rol: 'admin' },
+      { user: 'usuario', pass: '1234', rol: 'consultor' }
+    ];
+
+    let materiales = JSON.parse(localStorage.getItem('ef_materiales')) || [
+      { id: 1, nombre: 'Balones de Baloncesto', cantidad: 12, stockMin: 5, imagen: '' },
+      { id: 2, nombre: 'Conos de Entrenamiento', cantidad: 3, stockMin: 10, imagen: '' }
+    ];
+
+    let usuarioActual = JSON.parse(localStorage.getItem('ef_sesion')) || null;
+    let soloBajoStock = false;
+    let imagenTempBase64 = '';
+
+    // INICIALIZACIÓN
+    window.onload = () => {
+      guardarUsuariosEnStorage();
+      if (usuarioActual) {
+        mostrarApp();
+      }
+    };
+
+    function guardarUsuariosEnStorage() {
+      localStorage.setItem('ef_usuarios', JSON.stringify(usuarios));
+    }
+
+    function guardarMaterialesEnStorage() {
+      localStorage.setItem('ef_materiales', JSON.stringify(materiales));
+    }
+
+    // CONTROL DE AUTENTICACIÓN
+    function iniciarSesion(e) {
+      e.preventDefault();
+      const u = document.getElementById('loginUser').value;
+      const p = document.getElementById('loginPassword').value;
+
+      const encontrado = usuarios.find(user => user.user === u && user.pass === p);
+      if (encontrado) {
+        usuarioActual = encontrado;
+        localStorage.setItem('ef_sesion', JSON.stringify(usuarioActual));
+        document.getElementById('loginError').classList.add('hidden');
+        mostrarApp();
+      } else {
+        document.getElementById('loginError').classList.remove('hidden');
+      }
+    }
+
+    function cerrarSesion() {
+      usuarioActual = null;
+      localStorage.removeItem('ef_sesion');
+      document.getElementById('appView').classList.add('hidden');
+      document.getElementById('loginView').classList.remove('hidden');
+    }
+
+    function mostrarApp() {
+      document.getElementById('loginView').classList.add('hidden');
+      document.getElementById('appView').classList.remove('hidden');
+      document.getElementById('userInfo').innerText = `Usuario: ${usuarioActual.user} (${usuarioActual.rol})`;
+
+      // Aplicar restricciones según el rol
+      const esAdmin = usuarioActual.rol === 'admin';
+      document.querySelectorAll('.solo-admin').forEach(el => {
+        if (esAdmin) el.classList.remove('hidden');
+        else el.classList.add('hidden');
+      });
+
+      renderizarMateriales();
+    }
+
+    // COMPRESIÓN DE IMÁGENES MEDIANTE CANVAS
+    function previewImagen(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.src = e.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxDim = 500;
+          let w = img.width, h = img.height;
+
+          if (w > h && w > maxDim) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else if (h > maxDim) {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+
+          imagenTempBase64 = canvas.toDataURL('image/jpeg', 0.7);
+          const preview = document.getElementById('matImgPreview');
+          preview.src = imagenTempBase64;
+          preview.classList.remove('hidden');
+        };
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // RENDERIZADO Y BÚSQUEDA
+    function renderizarMateriales() {
+      const lista = document.getElementById('listaMateriales');
+      const busqueda = document.getElementById('searchInput').value.toLowerCase();
+      lista.innerHTML = '';
+
+      const filtrados = materiales.filter(m => {
+        const coincideNombre = m.nombre.toLowerCase().includes(busqueda);
+        const coincideStock = soloBajoStock ? m.cantidad <= m.stockMin : true;
+        return coincideNombre && coincideStock;
+      });
+
+      filtrados.forEach(m => {
+        const bajoStock = m.cantidad <= m.stockMin;
+        const esAdmin = usuarioActual.rol === 'admin';
+
+        const card = document.createElement('div');
+        card.className = `bg-white p-4 rounded-xl shadow-sm border-l-4 flex gap-3 items-center ${bajoStock ? 'border-red-500' : 'border-green-500'}`;
+        card.innerHTML = `
+          ${m.imagen ? `<img src="${m.imagen}" onclick="ampliarFoto('${m.imagen}')" class="w-16 h-16 object-cover rounded-lg cursor-pointer">` : '<div class="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-xs">Sin foto</div>'}
+          <div class="flex-1">
+            <h4 class="font-bold text-gray-800 text-sm">${m.nombre}</h4>
+            <p class="text-xs text-gray-500">Cantidad: <span class="font-bold text-base ${bajoStock ? 'text-red-600' : 'text-gray-800'}">${m.cantidad}</span> (Mín: ${m.stockMin})</p>
+            ${bajoStock ? '<span class="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold">⚠️ Bajo Stock</span>' : ''}
+          </div>
+          ${esAdmin ? `
+            <div class="flex flex-col gap-1">
+              <div class="flex gap-1">
+                <button onclick="cambiarCantidad(${m.id}, -1)" class="bg-gray-200 px-2 py-1 rounded text-xs font-bold">-</button>
+                <button onclick="cambiarCantidad(${m.id}, 1)" class="bg-gray-200 px-2 py-1 rounded text-xs font-bold">+</button>
+              </div>
+              <div class="flex gap-1 justify-end">
+                <button onclick="editarMaterial(${m.id})" class="text-blue-600 text-xs font-semibold">Editar</button>
+                <button onclick="eliminarMaterial(${m.id})" class="text-red-600 text-xs font-semibold">Borrar</button>
+              </div>
+            </div>
+          ` : ''}
+        `;
+        lista.appendChild(card);
+      });
+    }
+
+    function cambiarCantidad(id, delta) {
+      const item = materiales.find(m => m.id === id);
+      if (item) {
+        item.cantidad = Math.max(0, item.cantidad + delta);
+        guardarMaterialesEnStorage();
+        renderizarMateriales();
+      }
+    }
+
+    function filtrarBajoStock() {
+      soloBajoStock = !soloBajoStock;
+      const btn = document.getElementById('btnFiltroStock');
+      btn.className = soloBajoStock ? "bg-red-600 text-white text-xs px-3 py-2 rounded-lg font-medium" : "bg-gray-200 text-xs px-3 py-2 rounded-lg font-medium";
+      renderizarMateriales();
+    }
+
+    // GESTIÓN DE MATERIALES
+    function abrirModalMaterial() {
+      document.getElementById('formMaterial').reset();
+      document.getElementById('materialId').value = '';
+      document.getElementById('modalMaterialTitulo').innerText = "Añadir Material";
+      document.getElementById('matImgPreview').classList.add('hidden');
+      imagenTempBase64 = '';
+      document.getElementById('modalMaterial').classList.remove('hidden');
+    }
+
+    function cerrarModalMaterial() {
+      document.getElementById('modalMaterial').classList.add('hidden');
+    }
+
+    function guardarMaterial(e) {
+      e.preventDefault();
+      const id = document.getElementById('materialId').value;
+      const nombre = document.getElementById('matNombre').value;
+      const cantidad = parseInt(document.getElementById('matCantidad').value);
+      const stockMin = parseInt(document.getElementById('matStockMin').value);
+
+      if (id) {
+        const item = materiales.find(m => m.id == id);
+        item.nombre = nombre;
+        item.cantidad = cantidad;
+        item.stockMin = stockMin;
+        if (imagenTempBase64) item.imagen = imagenTempBase64;
+      } else {
+        materiales.push({
+          id: Date.now(),
+          nombre,
+          cantidad,
+          stockMin,
+          imagen: imagenTempBase64
+        });
+      }
+
+      guardarMaterialesEnStorage();
+      cerrarModalMaterial();
+      renderizarMateriales();
+    }
+
+    function editarMaterial(id) {
+      const item = materiales.find(m => m.id === id);
+      if (!item) return;
+
+      document.getElementById('materialId').value = item.id;
+      document.getElementById('matNombre').value = item.nombre;
+      document.getElementById('matCantidad').value = item.cantidad;
+      document.getElementById('matStockMin').value = item.stockMin;
+      document.getElementById('modalMaterialTitulo').innerText = "Editar Material";
+
+      const preview = document.getElementById('matImgPreview');
+      if (item.imagen) {
+        preview.src = item.imagen;
+        preview.classList.remove('hidden');
+        imagenTempBase64 = item.imagen;
+      } else {
+        preview.classList.add('hidden');
+        imagenTempBase64 = '';
+      }
+
+      document.getElementById('modalMaterial').classList.remove('hidden');
+    }
+
+    function eliminarMaterial(id) {
+      if (confirm('¿Deseas eliminar este material del inventario?')) {
+        materiales = materiales.filter(m => m.id !== id);
+        guardarMaterialesEnStorage();
+        renderizarMateriales();
+      }
+    }
+
+    function ampliarFoto(src) {
+      document.getElementById('fotoAmpliada').src = src;
+      document.getElementById('modalFoto').classList.remove('hidden');
+    }
+
+    // GESTIÓN DE USUARIOS
+    function abrirModalUsuarios() {
+      renderizarListaUsuarios();
+      document.getElementById('modalUsuarios').classList.remove('hidden');
+    }
+
+    function cerrarModalUsuarios() {
+      document.getElementById('modalUsuarios').classList.add('hidden');
+    }
+
+    function renderizarListaUsuarios() {
+      const cont = document.getElementById('listaUsuarios');
+      cont.innerHTML = '';
+      usuarios.forEach((u, i) => {
+        const div = document.createElement('div');
+        div.className = "flex justify-between items-center bg-gray-100 p-2 rounded text-xs";
+        div.innerHTML = `
+          <span><strong>${u.user}</strong> (${u.rol})</span>
+          ${u.user !== 'admin' ? `<button onclick="borrarUsuario(${i})" class="text-red-600 font-bold">Borrar</button>` : '<span class="text-gray-400">Principal</span>'}
+        `;
+        cont.appendChild(div);
+      });
+    }
+
+    function crearOModificarUsuario(e) {
+      e.preventDefault();
+      const u = document.getElementById('newUsername').value;
+      const p = document.getElementById('newUserPass').value;
+      const r = document.getElementById('newUserRole').value;
+
+      const idx = usuarios.findIndex(user => user.user === u);
+      if (idx !== -1) {
+        usuarios[idx].pass = p;
+        usuarios[idx].rol = r;
+      } else {
+        usuarios.push({ user: u, pass: p, rol: r });
+      }
+
+      guardarUsuariosEnStorage();
+      renderizarListaUsuarios();
+      e.target.reset();
+    }
+
+    function borrarUsuario(index) {
+      usuarios.splice(index, 1);
+      guardarUsuariosEnStorage();
+      renderizarListaUsuarios();
+    }
+  </script>
+
+  <!-- Registro del Service Worker para la PWA -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+          .then(registro => console.log('Service Worker registrado con éxito:', registro))
+          .catch(error => console.error('Error al registrar el Service Worker:', error));
+      });
+    }
+  </script>
+</body>
+</html>
