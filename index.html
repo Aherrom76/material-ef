@@ -80,7 +80,7 @@
         </div>
       </div>
 
-      <!-- Campo para Adjuntar Foto -->
+      <!-- CAMPO PARA ADJUNTAR FOTO -->
       <div>
         <label class="block text-xs font-bold text-gray-600">Foto del Material</label>
         <input type="file" id="mat-foto" accept="image/*" onchange="procesarFoto(event)" class="w-full border p-1 rounded text-sm bg-gray-50 mt-1 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200">
@@ -328,7 +328,6 @@
       lector.onload = function(evento) {
         const img = new Image();
         img.onload = function() {
-          // Redimensionamos la foto a un máximo de 300px para no sobrecargar Firestore
           const canvas = document.createElement('canvas');
           const maxDim = 300;
           let ancho = img.width;
@@ -347,7 +346,6 @@
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, ancho, alto);
 
-          // Convertimos a formato JPG comprimido
           const fotoComprimida = canvas.toDataURL('image/jpeg', 0.7);
           document.getElementById('mat-foto-base64').value = fotoComprimida;
           document.getElementById('vista-previa').src = fotoComprimida;
