@@ -79,6 +79,18 @@
           <input type="number" id="mat-stock-min" min="0" required class="w-full border p-2 rounded text-sm">
         </div>
       </div>
+
+      <!-- Campo para Adjuntar Foto -->
+      <div>
+        <label class="block text-xs font-bold text-gray-600">Foto del Material</label>
+        <input type="file" id="mat-foto" accept="image/*" onchange="procesarFoto(event)" class="w-full border p-1 rounded text-sm bg-gray-50 mt-1 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200">
+        <input type="hidden" id="mat-foto-base64">
+        <div id="contenedor-previa" class="hidden mt-2 flex items-center gap-2">
+          <img id="vista-previa" class="w-16 h-16 object-cover rounded border" alt="Previa">
+          <button type="button" onclick="quitarFoto()" class="text-xs text-red-600 font-bold">Eliminar foto</button>
+        </div>
+      </div>
+
       <div class="flex justify-end gap-2 pt-2">
         <button type="button" onclick="document.getElementById('modal-material').close()" class="px-4 py-2 bg-gray-200 rounded text-sm font-bold">Cancelar</button>
         <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded text-sm font-bold">Guardar</button>
@@ -109,7 +121,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // Credenciales obtenidas de la consola de Firebase
+    // Credenciales de Firebase de tu proyecto
     const firebaseConfig = {
       apiKey: "AIzaSyAo4xC0MEHBdCkBLLZcXwtz340bnR16G-I",
       authDomain: "material-ef.firebaseapp.com",
@@ -133,10 +145,9 @@
     onSnapshot(collection(db, "materiales"), (snapshot) => {
       window.materiales = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       
-      // Carga datos por defecto en la primera ejecución
       if (snapshot.empty) {
-        setDoc(doc(db, "materiales", "1"), { nombre: "Balones de Baloncesto", cantidad: 12, stockMin: 5 });
-        setDoc(doc(db, "materiales", "2"), { nombre: "Conos de Entrenamiento", cantidad: 3, stockMin: 10 });
+        setDoc(doc(db, "materiales", "1"), { nombre: "Balones de Baloncesto", cantidad: 12, stockMin: 5, foto: "" });
+        setDoc(doc(db, "materiales", "2"), { nombre: "Conos de Entrenamiento", cantidad: 3, stockMin: 10, foto: "" });
       }
 
       if (window.usuarioActivo) window.renderizarMateriales();
@@ -146,7 +157,6 @@
     onSnapshot(collection(db, "usuarios"), (snapshot) => {
       window.usuarios = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      // Usuarios predeterminados si la base de datos está vacía
       if (snapshot.empty) {
         setDoc(doc(db, "usuarios", "admin"), { user: "admin", pass: "1234", rol: "admin" });
         setDoc(doc(db, "usuarios", "usuario"), { user: "usuario", pass: "1234", rol: "consultor" });
@@ -163,7 +173,8 @@
       await setDoc(doc(db, "materiales", docId), {
         nombre: mat.nombre,
         cantidad: Number(mat.cantidad),
-        stockMin: Number(mat.stockMin)
+        stockMin: Number(mat.stockMin),
+        foto: mat.foto || ""
       });
     };
 
@@ -227,21 +238,24 @@
       filtrados.forEach(m => {
         const esBajo = m.cantidad <= m.stockMin;
         const div = document.createElement('div');
-        div.className = `bg-white p-4 rounded-lg shadow border-l-4 ${esBajo ? 'border-red-500' : 'border-green-500'} flex justify-between items-center`;
+        div.className = `bg-white p-4 rounded-lg shadow border-l-4 ${esBajo ? 'border-red-500' : 'border-green-500'} flex justify-between items-center gap-3`;
 
         const esAdmin = window.usuarioActivo && window.usuarioActivo.rol === 'admin';
 
         div.innerHTML = `
-          <div>
-            <h4 class="font-bold text-gray-800">${m.nombre}</h4>
-            <p class="text-sm text-gray-500">Cantidad: <span class="font-bold text-gray-700">${m.cantidad}</span> (Mín: ${m.stockMin})</p>
-            ${esBajo ? '<span class="text-xs text-red-600 font-bold bg-red-100 px-2 py-0.5 rounded">⚠️ Bajo Stock</span>' : ''}
+          <div class="flex items-center gap-3">
+            ${m.foto ? `<img src="${m.foto}" class="w-12 h-12 rounded object-cover border" alt="Foto">` : `<div class="w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-400 font-bold border">Sin foto</div>`}
+            <div>
+              <h4 class="font-bold text-gray-800">${m.nombre}</h4>
+              <p class="text-sm text-gray-500">Cantidad: <span class="font-bold text-gray-700">${m.cantidad}</span> (Mín: ${m.stockMin})</p>
+              ${esBajo ? '<span class="text-xs text-red-600 font-bold bg-red-100 px-2 py-0.5 rounded">⚠️ Bajo Stock</span>' : ''}
+            </div>
           </div>
           ${esAdmin ? `
             <div class="flex items-center gap-2">
               <button onclick="modificarCantidad('${m.id}', -1)" class="bg-gray-200 px-2.5 py-1 rounded font-bold">-</button>
               <button onclick="modificarCantidad('${m.id}', 1)" class="bg-gray-200 px-2.5 py-1 rounded font-bold">+</button>
-              <button onclick="editarMaterial('${m.id}')" class="text-blue-600 text-xs font-bold ml-2">Editar</button>
+              <button onclick="editarMaterial('${m.id}')" class="text-blue-600 text-xs font-bold ml-1">Editar</button>
               <button onclick="eliminarMaterial('${m.id}')" class="text-red-600 text-xs font-bold">Borrar</button>
             </div>
           ` : ''}
@@ -276,6 +290,9 @@
       document.getElementById('mat-nombre').value = '';
       document.getElementById('mat-cantidad').value = '0';
       document.getElementById('mat-stock-min').value = '5';
+      document.getElementById('mat-foto').value = '';
+      document.getElementById('mat-foto-base64').value = '';
+      document.getElementById('contenedor-previa').classList.add('hidden');
       document.getElementById('modal-titulo').innerText = 'Añadir Material';
       document.getElementById('modal-material').showModal();
     }
@@ -287,9 +304,64 @@
         document.getElementById('mat-nombre').value = mat.nombre;
         document.getElementById('mat-cantidad').value = mat.cantidad;
         document.getElementById('mat-stock-min').value = mat.stockMin;
+        document.getElementById('mat-foto').value = '';
+        document.getElementById('mat-foto-base64').value = mat.foto || '';
+
+        if (mat.foto) {
+          document.getElementById('vista-previa').src = mat.foto;
+          document.getElementById('contenedor-previa').classList.remove('hidden');
+        } else {
+          document.getElementById('contenedor-previa').classList.add('hidden');
+        }
+
         document.getElementById('modal-titulo').innerText = 'Editar Material';
         document.getElementById('modal-material').showModal();
       }
+    }
+
+    // PROCESAMIENTO Y COMPRESIÓN DE LA FOTO SELECCIONADA
+    function procesarFoto(e) {
+      const archivo = e.target.files[0];
+      if (!archivo) return;
+
+      const lector = new FileReader();
+      lector.onload = function(evento) {
+        const img = new Image();
+        img.onload = function() {
+          // Redimensionamos la foto a un máximo de 300px para no sobrecargar Firestore
+          const canvas = document.createElement('canvas');
+          const maxDim = 300;
+          let ancho = img.width;
+          let alto = img.height;
+
+          if (ancho > alto && ancho > maxDim) {
+            alto *= maxDim / ancho;
+            ancho = maxDim;
+          } else if (alto > maxDim) {
+            ancho *= maxDim / alto;
+            alto = maxDim;
+          }
+
+          canvas.width = ancho;
+          canvas.height = alto;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, ancho, alto);
+
+          // Convertimos a formato JPG comprimido
+          const fotoComprimida = canvas.toDataURL('image/jpeg', 0.7);
+          document.getElementById('mat-foto-base64').value = fotoComprimida;
+          document.getElementById('vista-previa').src = fotoComprimida;
+          document.getElementById('contenedor-previa').classList.remove('hidden');
+        };
+        img.src = evento.target.result;
+      };
+      lector.readAsDataURL(archivo);
+    }
+
+    function quitarFoto() {
+      document.getElementById('mat-foto').value = '';
+      document.getElementById('mat-foto-base64').value = '';
+      document.getElementById('contenedor-previa').classList.add('hidden');
     }
 
     async function guardarMaterial(e) {
@@ -299,7 +371,8 @@
         id: id || null,
         nombre: document.getElementById('mat-nombre').value.trim(),
         cantidad: document.getElementById('mat-cantidad').value,
-        stockMin: document.getElementById('mat-stock-min').value
+        stockMin: document.getElementById('mat-stock-min').value,
+        foto: document.getElementById('mat-foto-base64').value
       };
       await window.guardarMaterialNube(mat);
       document.getElementById('modal-material').close();
